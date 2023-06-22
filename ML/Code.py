@@ -14,16 +14,20 @@ from sklearn.model_selection import train_test_split
 
 os.environ['TF_GPU_ALLOCATOR'] = 'cuda_malloc_async'
 
+# Folders named after the class their files belong in are found in /training_data
+# In our case /training_data/cirrus and /training_data/not cirrus
+# Note that the code is meant to solve only multiclass classification problems
 data_dir = 'training_data'
 
 batch_size = 8
-img_width = 684 # old value: 1296
-img_height = 513 # old value: 972
+img_width = 684
+img_height = 513 
 
 
 # Dataset functions
 
 
+# Load the photos and their respective labels, as inferred from the directory names
 def load_data(data_dir):
 
     label_names = []
@@ -68,26 +72,22 @@ data, labels, no_classes, class_names = load_data(data_dir)
 data = np.asarray(data).astype('float32')
 labels = np.asarray(labels).astype('int')
 
-# Make a model
+# The dataset was severely imbalanced initially, leading the model to put all photos in the majority class
+# More photos were selected to correct that imbalance
+# (all images were taken from https://www.flickr.com/photos/raspberrypi/albums)
 
 
-'''data_augmentation = keras.Sequential(
-    [   
-        layers.RandomFlip("horizontal",
-                          input_shape = (img_height,
-                                         img_width,
-                                         3)),
-        layers.RandomRotation(0.1), 
-        layers.RandomZoom(0.1),
-    ]
-)''' 
+# Create the model
 
 
+# The model follows a typical CNN structure and has been limited to only just a few layers due to overfitting
+# Among the solutions to that problem are data augmentation and dropout layers, the latter of which is implemented below
+# We tried adding more layers, in a manner inspired by the VGG16 model,
+# However most of the improvement comes from changing optimizers and their parameters
 def create_model(no_classes):
 
     model = Sequential([
 
-        #data_augmentation,
         layers.Rescaling(1./255, input_shape=(img_height, img_width, 3)),
         layers.Conv2D(16, 3, padding='same', activation='relu'),
         layers.MaxPooling2D(),
@@ -113,10 +113,15 @@ def create_model(no_classes):
 
 # K Fold cross validation 
 
+# Does not return anything, as this is a method solely used for model validation
+# It involves training in multiple folds, each of which uses a diferent portion of the data for training and validation
+# It helps with telling how well the model is able to generalize
+
 
 no_splits = 10
 
 
+# Fucntion that generates plots used in diagnosing the model
 def visualization(history, epochs):
 
     acc = history.history['accuracy']
@@ -175,13 +180,13 @@ def run_fold(index, no_classes, training_indices, validation_indices, accuracies
     visualization(history, epochs)
 
 
-# Run the model in separate processes beceause tensorflow doesn't clear the memory for some reason
-
-
+# The folds are run in separate processes due to memory issues
+# Function collects accuracies and losses and displays them
 def run_kfold(): 
 
+    # Stratified ensures class distribution in selection matches class distribution in dataset
     cross_validator = StratifiedKFold(n_splits = no_splits, shuffle = True)
-
+    
     accuracies = multiprocessing.Array('d', no_splits)
     losses = multiprocessing.Array('d', no_splits)
 
@@ -203,15 +208,13 @@ def run_kfold():
     print('------------------------------------------------------------------------')
 
 
-# Train and save the model as you normally would  
+# If satisfied with performance in KFold, train and save the model
 
 
 saved_model = 'saved_model/my_model'
 
-def train():
 
-    # Train - validation split
-    # Shuffle the data first
+def train():
 
     training_data, validation_data, training_labels, validation_labels = train_test_split(data, labels, test_size = 0.2, stratify=labels)
 
@@ -266,7 +269,9 @@ def classify(model_path):
     for index, image in enumerate(os.listdir(samples_path)):
 
         score = tf.nn.softmax(predictions[index])
-        # if predictions[index][class_names.index('cirrus')] == max(predictions[index]):
+
+        # Move photos from to_classify in the folder corresponding to the predicted label
+        
         if class_names[np.argmax(score)] == 'cirrus':
             shutil.move(os.path.join(samples_path, image), os.path.join(end_path, 'with_cirrus', image))
         else:
