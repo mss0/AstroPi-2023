@@ -17,6 +17,7 @@ os.environ['TF_GPU_ALLOCATOR'] = 'cuda_malloc_async'
 # Folders named after the class their files belong in are found in /training_data
 # In our case /training_data/cirrus and /training_data/not cirrus
 # Note that the code is meant to solve only multiclass classification problems
+
 data_dir = 'training_data'
 
 batch_size = 8
@@ -83,7 +84,8 @@ labels = np.asarray(labels).astype('int')
 # The model follows a typical CNN structure and has been limited to only just a few layers due to overfitting
 # Among the solutions to that problem are data augmentation and dropout layers, the latter of which is implemented below
 # We tried adding more layers, in a manner inspired by the VGG16 model,
-# However most of the improvement comes from changing optimizers and their parameters
+# However we found most of the improvement from changing optimizers and their parameters
+
 def create_model(no_classes):
 
     model = Sequential([
@@ -181,7 +183,7 @@ def run_fold(index, no_classes, training_indices, validation_indices, accuracies
 
 
 # The folds are run in separate processes due to memory issues
-# Function collects accuracies and losses and displays them
+# Function collects final accuracies and losses and displays them
 def run_kfold(): 
 
     # Stratified ensures class distribution in selection matches class distribution in dataset
